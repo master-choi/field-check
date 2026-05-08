@@ -1,98 +1,81 @@
-import flet as ft
+import streamlit as st
 
-def main(page: ft.Page):
-    page.title = "현장 견적 마스터"
-    page.scroll = "auto"
-    page.theme_mode = "light"
+# 페이지 설정 (스마트폰에서 크게 보이도록)
+st.set_page_config(page_title="현장 견적 마스터", layout="centered")
 
-    # --- [단가 설정부: 나중에 이 숫자만 바꾸면 됩니다] ---
-    prices = {
-        "insulation": 100000,    # 단열 1m2당
-        "wallpaper": 30000,      # 도배 1m2당
-        "window_base": 408163,   # 창문 1m2당 (80만원/1.96m2 기준)
-        "boiler": 800000,        # 보일러 기본
-        "oil_tank": 200000,      # 기름통 추가
-        "home_door": 500000,     # 홈도어 기본
-    }
+# --- [단가 설정: 사장님이 여기서 직접 수정하세요] ---
+prices = {
+    "단열": 100000,    # 1m2당
+    "도배": 30000,     # 1m2당
+    "창문": 408163,    # 1m2당 (1400x1400 기준 80만원)
+    "보일러": 800000,  # 기본 설치비
+    "기름통": 200000   # 추가 비용
+}
 
-    # --- [입력 필드 설정] ---
-    height_input = ft.TextField(label="천장 높이(mm)", keyboard_type="number", value="2200")
-    width_input = ft.TextField(label="방 가로(mm)", keyboard_type="number")
-    length_input = ft.TextField(label="방 세로(mm)", keyboard_type="number")
-    
-    # 면적 선택 체크박스
-    wall_checks = [ft.Checkbox(label=f"벽체 {i+1}면") for i in range(4)]
-    ceiling_check = ft.Checkbox(label="천장")
-    
-    # 추가 품목
-    window_w = ft.TextField(label="창문 가로(mm)", value="1400", width=150)
-    window_h = ft.TextField(label="창문 세로(mm)", value="1400", width=150)
-    
-    door_type = ft.Dropdown(
-        label="문 종류",
-        options=[
-            ft.dropdown.Option("홈도어(110)"),
-            ft.dropdown.Option("홈도어(120)"),
-            ft.dropdown.Option("출입문(여닫이)"),
-            ft.dropdown.Option("출입문(미닫이)"),
-        ]
-    )
+st.title("🏗️ 현장 견적 산출기")
+st.write("치수를 입력하면 자동으로 총액이 계산됩니다.")
 
-    boiler_check = ft.Checkbox(label="보일러 설치")
-    tank_check = ft.Checkbox(label="기름통 포함")
+# 1. 예산 한도 설정
+limit = st.number_input("💰 공사 한도 금액 (원)", value=10000000, step=100000)
 
-    result_text = ft.Text(size=20, weight="bold", color="blue")
+st.divider()
 
-    def calculate(e):
-        try:
-            h = float(height_input.value) / 1000
-            w = float(width_input.value) / 1000
-            l = float(length_input.value) / 1000
-            
-            total_price = 0
-            ins_area = 0
-            
-            # 1, 3번 벽 (가로 기준) / 2, 4번 벽 (세로 기준)
-            areas = [w * h, l * h, w * h, l * h]
-            for i, check in enumerate(wall_checks):
-                if check.value:
-                    ins_area += areas[i]
-            
-            if ceiling_check.value:
-                ins_area += (w * l)
-                
-            # 단열 및 도배 계산
-            total_price += ins_area * prices["insulation"]
-            total_price += ins_area * prices["wallpaper"] # 선택 면적만큼 도배
+# 2. 기본 치수 입력
+st.subheader("📏 기본 치수 (mm)")
+col1, col2, col3 = st.columns(3)
+with col1:
+    h = st.number_input("천장높이", value=2200)
+with col2:
+    w = st.number_input("방 가로", value=0)
+with col3:
+    l = st.number_input("방 세로", value=0)
 
-            # 창문 계산
-            win_area = (float(window_w.value) * float(window_h.value)) / 1000000
-            total_price += win_area * prices["window_base"]
+# 3. 단열 면 선택
+st.subheader("🏠 단열/도배 면 선택")
+cols = st.columns(3)
+w1 = cols[0].checkbox("벽체 1면")
+w2 = cols[1].checkbox("벽체 2면")
+w3 = cols[2].checkbox("벽체 3면")
+w4 = cols[0].checkbox("벽체 4면")
+ceil = cols[1].checkbox("천장")
 
-            # 보일러 및 기타
-            if boiler_check.value: total_price += prices["boiler"]
-            if tank_check.value: total_price += prices["oil_tank"]
+# 4. 추가 품목
+st.subheader("🚪 창호 및 보일러")
+cw, ch = st.columns(2)
+win_w = cw.number_input("창문 가로(mm)", value=1400)
+win_h = ch.number_input("창문 세로(mm)", value=1400)
 
-            result_text.value = f"총 견적 금액: {total_price:,.0f} 원"
-            page.update()
-        except:
-            result_text.value = "숫자를 정확히 입력해주세요."
-            page.update()
+boiler = st.checkbox("보일러 설치")
+oil_tank = st.checkbox("보일러 기름통 추가")
 
-    # 화면 배치
-    page.add(
-        ft.Text("📏 현장 치수 입력", size=25, weight="bold"),
-        height_input, width_input, length_input,
-        ft.Divider(),
-        ft.Text("🏠 단열/도배 면적 선택"),
-        ft.Row(wall_checks[:2]), ft.Row(wall_checks[2:]), ceiling_check,
-        ft.Divider(),
-        ft.Text("🚪 창호 및 보일러"),
-        ft.Row([window_w, window_h]),
-        door_type,
-        ft.Row([boiler_check, tank_check]),
-        ft.ElevatedButton("견적 계산하기", on_click=calculate, height=50),
-        result_text
-    )
+# --- 계산 로직 ---
+total_price = 0
+ins_area = 0
 
-ft.app(target=main)
+# 선택된 면적 합산 (mm -> m 변환)
+h_m, w_m, l_m = h/1000, w/1000, l/1000
+areas = [w_m * h_m, l_m * h_m, w_m * h_m, l_m * h_m]
+checks = [w1, w2, w3, w4]
+
+for i, checked in enumerate(checks):
+    if checked:
+        ins_area += areas[i]
+if ceil:
+    ins_area += (w_m * l_m)
+
+# 금액 합산
+total_price += ins_area * (prices["단열"] + prices["도배"])
+total_price += (win_w * win_h / 1000000) * prices["창문"]
+if boiler: total_price += prices["boiler"]
+if oil_tank: total_price += prices["oil_tank"]
+
+# --- 결과 표시 ---
+st.divider()
+remainder = limit - total_price
+
+if remainder < 0:
+    st.error(f"⚠️ 예산 초과! (초과금액: {abs(remainder):,.0f}원)")
+else:
+    st.success(f"✅ 예산 내 적정 (남은잔액: {remainder:,.0f}원)")
+
+st.metric(label="총 합계 금액", value=f"{total_price:,.0f} 원")
