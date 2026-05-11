@@ -17,7 +17,7 @@ DEFAULT_PRICES = {
     'boiler': 800000,
     'oilTank': 200000
 }
-ADMIN_PASSWORD = '1234'
+ADMIN_PASSWORD = '0131'
 PRICE_FILE = "prices.json"
 
 # ==================== 단가 불러오기/저장 함수 ====================
@@ -36,9 +36,9 @@ def save_prices(prices):
 if 'prices' not in st.session_state:
     st.session_state.prices = load_prices()
 
-st.set_page_config(page_title="현장 견적 마스터", page_icon="🏗️", layout="centered")
+st.set_page_config(page_title="온성 견적 마스터", page_icon="🏗️", layout="centered")
 
-st.markdown("<h1 style='text-align: center;'>🏗️ 현장 견적 산출기</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;'>🏗️ 온성 견적 산출기</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: gray;'>치수를 입력하면 자동으로 총액이 계산됩니다</p>", unsafe_allow_html=True)
 
 # ==================== 관리자 패널 ====================
@@ -81,7 +81,7 @@ with st.expander("🔒 단가 설정 (관리자)"):
 st.divider()
 
 # ==================== 입력 섹션 ====================
-limit = st.number_input("💰 공사 한도 금액 (원)", value=10000000, step=100000)
+limit = st.number_input("💰 공사 한도 금액 (원)", value=3000000, step=100000)
 
 st.subheader("📏 방 치수 (mm)")
 col_h, col_w, col_l = st.columns(3)
