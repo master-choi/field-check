@@ -3,10 +3,10 @@ import json
 
 # ==================== 기본 단가 & 파일 경로 ====================
 DEFAULT_PRICES = {
-    'insulationWall': 100000,
-    'insulationCeiling': 100000,
-    'wallpaper': 30000,
-    'window_per_m2': 408163,
+    'insulationWall': 42551,
+    'insulationCeiling': 51140,
+    'wallpaper': 12175,
+    'window_per_m2': 531125,
     'homeDoor_110': 300000,
     'homeDoor_120': 350000,
     'homeDoor_130': 400000,
@@ -14,7 +14,7 @@ DEFAULT_PRICES = {
     'entrance_hinge': 700000,
     'entrance_hinge_fix': 900000,
     'entrance_sliding': 800000,
-    'boiler': 800000,
+    'boiler': 1100000,
     'oilTank': 200000
 }
 ADMIN_PASSWORD = '0131'
