@@ -21,13 +21,14 @@ DEFAULT_PRICES = {
     'boiler': 1100000,
     'oilTank': 200000,
     
-    # --- 섬지역 전용 요율 및 경비 ---
-    'island_ac_reattach': 10000,         # 에어컨 간이 탈부착
-    'island_transport_per_m2': 1681.6,   # 소운반비 (m²당)
-    'island_waste_per_m2': 1345.4,       # 폐자재반출 (m²당)
-    'island_expense_fixed': 34433,       # 고정 경비
-    'island_surcharge_rate': 0.408374,   # 새로운 섬 할증률 (40.8374%)
-    'island_indirect_rate': 0.108794,    # 새로운 간접비율 (10.8794%)
+    # --- 섬지역 전용 요율 및 경비 (정밀 정산용 공식 기준 반영) ---
+    'island_ac_reattach': 10000,           # 에어컨 간이 탈부착
+    'island_transport_per_m2': 1681.6,     # 소운반비 (m²당)
+    'island_waste_per_m2': 1345.4,         # 폐자재반출 (m²당)
+    'island_expense_fixed': 34433,         # 고정 경비
+    'island_total_amount_rate': 1.1848944, # 순수공사비 -> 총금액 변환 요율
+    'island_surcharge_rate': 0.408371,     # 섬 할증률
+    'island_indirect_rate': 0.1087947,     # 간접비율
 }
 ADMIN_PASSWORD = '0131'
 PRICE_FILE = "prices.json"
@@ -47,7 +48,7 @@ def load_prices():
     try:
         with open(PRICE_FILE, 'r') as f:
             loaded = json.load(f)
-            # 기존 json에 없는 신규 단가(섬지역 등)가 생기면 자동으로 병합하여 에러 방지
+            # 기존 json에 없는 신규 단가가 생기면 자동으로 병합하여 에러 방지
             for k, v in DEFAULT_PRICES.items():
                 if k not in loaded:
                     loaded[k] = v
@@ -92,6 +93,9 @@ with st.expander("🔒 단가 설정 (관리자)"):
             st.session_state.prices['entrance_hinge'] = st.number_input("출입문 여닫이", value=st.session_state.prices['entrance_hinge'], step=1000)
             st.session_state.prices['entrance_hinge_fix'] = st.number_input("출입문 여닫이+픽스창", value=st.session_state.prices['entrance_hinge_fix'], step=1000)
             st.session_state.prices['entrance_sliding'] = st.number_input("출입문 미닫이", value=st.session_state.prices['entrance_sliding'], step=1000)
+            st.session_state.prices['island_total_amount_rate'] = st.number_input("섬 총금액 변환요율", value=st.session_state.prices['island_total_amount_rate'], format="%.7f")
+            st.session_state.prices['island_surcharge_rate'] = st.number_input("섬 할증률", value=st.session_state.prices['island_surcharge_rate'], format="%.7f")
+            st.session_state.prices['island_indirect_rate'] = st.number_input("섬 간접비율", value=st.session_state.prices['island_indirect_rate'], format="%.7f")
 
         col_btn1, col_btn2 = st.columns(2)
         with col_btn1:
@@ -123,7 +127,7 @@ p = st.session_state.prices
 
 if region_mode == "일반 내륙 (기존 방식)":
     # 🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦
-    #                일반 내륙 지역 (기존 코드 100% 유지 + 도배 분리 적용)
+    #                일반 내륙 지역 (기존 기능 100% 유지)
     # 🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦
     limit = st.number_input("💰 공사 한도 금액 (원)", value=3000000, step=100000)
 
@@ -181,7 +185,6 @@ if region_mode == "일반 내륙 (기존 방식)":
 
     st.info(wallpaper_msg)
 
-    # (유지) 창문, 방문, 현관문, 보일러 기존 코드
     st.subheader("🪟 창문")
     winCount = st.selectbox("창문 개수", [0, 1, 2, 3])
     windows = []
@@ -226,7 +229,6 @@ if region_mode == "일반 내륙 (기존 방식)":
     total = 0
     details = []
 
-    # 단열 (벽/천장 분리 적용)
     if insWallArea > 0:
         cost = insWallArea * p['insulationWall']
         total += cost
@@ -237,7 +239,6 @@ if region_mode == "일반 내륙 (기존 방식)":
         total += cost
         details.append(f"단열(천장): {insCeilingArea:.2f}m² × {p['insulationCeiling']:,}원 = {int(cost):,}원")
 
-    # 도배 (벽/천장 분리 적용)
     if wallWallpaperArea > 0:
         cost = wallWallpaperArea * p['wallpaperWall']
         total += cost
@@ -249,7 +250,6 @@ if region_mode == "일반 내륙 (기존 방식)":
         total += cost
         details.append(f"도배(천장): {ceilingWallpaperArea:.2f}m² × {p['wallpaperCeiling']:,}원 = {int(cost):,}원")
 
-    # (유지) 창문, 방문, 현관문, 보일러 금액 합산 로직
     for i, (w, h) in enumerate(windows):
         area = (w * h) / 1000000
         cost = area * p['window_per_m2']
@@ -293,7 +293,7 @@ if region_mode == "일반 내륙 (기존 방식)":
 
 else:
     # 🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧
-    #                섬 지역 (새로운 단가 및 할증 독립합산 적용)
+    #                섬 지역 (독립정산방식 정밀 수정)
     # 🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧
     st.subheader("📏 방 기본 치수 (mm)")
     col_w, col_l, col_h = st.columns(3)
@@ -301,7 +301,6 @@ else:
     with col_l: room_l = st.number_input("남/북벽 가로", value=2500, step=100, key="is_l")
     with col_h: room_h = st.number_input("천장 높이", value=2400, step=100, key="is_h")
 
-    # --- 도배 시공 방식 전역 세팅 ---
     st.subheader("🎨 도배 시공 방식 선택")
     island_wallpaper_mode = st.radio(
         "도배 방식을 먼저 선택해주세요",
@@ -327,7 +326,6 @@ else:
             with col1:
                 do_insul = st.checkbox(f"{wall_name} 단열", key=f"is_insul_{wall_name}")
             with col2:
-                # 전체 도배일 때는 강제로 고정, 부분 도배일때는 체크박스 활성화
                 if island_wallpaper_mode == "전체도배 (방 전체 5면)":
                     do_wallp = st.checkbox(f"{wall_name} 도배 (전체도배 적용됨)", value=True, disabled=True, key=f"is_wallp_fix_{wall_name}")
                 elif island_wallpaper_mode == "부분도배 (벽면/천장 개별 선택)":
@@ -335,7 +333,6 @@ else:
                 else:
                     do_wallp = False
             
-            # 단열이나 도배 중 하나라도 진행하면 제외면적 입력창 활성화
             if do_insul or do_wallp:
                 st.write("**제외할 창문/문 선택 (최대 2개)**")
                 exc_col1, exc_col2 = st.columns(2)
@@ -357,12 +354,11 @@ else:
                 wall_results[wall_name] = {
                     "insul": final_area if do_insul else 0,
                     "wallp": final_area if do_wallp else 0,
-                    "final_area": final_area # 공통내역 계산용
+                    "final_area": final_area 
                 }
             else:
                 wall_results[wall_name] = {"insul": 0, "wallp": 0, "final_area": 0}
 
-    # --- 천장 설정 ---
     with st.expander("▶ 천장 시공 설정"):
         col1, col2 = st.columns(2)
         with col1: 
@@ -383,20 +379,17 @@ else:
     # TODO: 차후 이곳에 섬지역 전용 창문, 방문, 출입문, 보일러 입력 칸을 추가하세요
     # ==========================================================
     st.divider()
-    
-    # 부가 항목
     ac_add = st.checkbox("에어컨 간이 탈부착 추가 (+10,000원)", key="is_ac")
-
     st.divider()
 
     # --- 섬 지역 계산 로직 ---
-    total_base = 0
+    total_base = 0.0
     details = []
 
     total_wall_insul_area = sum(w["insul"] for w in wall_results.values())
     total_wall_wallp_area = sum(w["wallp"] for w in wall_results.values())
 
-    # 1. 단열 금액 합산 (벽체/천장 차등 단가)
+    # 1. 단열 금액 합산
     if total_wall_insul_area > 0:
         cost = total_wall_insul_area * p['insulationWall']
         total_base += cost
@@ -407,7 +400,7 @@ else:
         total_base += cost
         details.append(f"단열(천장/고단가): {ceiling_area:.2f}m² × {p['insulationCeiling']:,}원 = {int(cost):,}원")
 
-    # 2. 도배 금액 합산 (벽체/천장 차등 단가)
+    # 2. 도배 금액 합산
     if total_wall_wallp_area > 0:
         cost = total_wall_wallp_area * p['wallpaperWall']
         total_base += cost
@@ -427,37 +420,44 @@ else:
     # TODO: 차후 이곳에 섬지역 전용 창문, 방문, 보일러 금액 합산 로직을 추가하세요
     # ==========================================================
 
-    # 4. 공통 내역 (시공이 일어난 실제 면적 비례 + 고정 경비)
+    # 4. 공통 내역 (소전표 단위 반올림 처리 반영)
     active_wall_area = sum(w["final_area"] for w in wall_results.values())
     total_active_area = active_wall_area + (ceiling_area if (ceiling_insul or ceiling_wallp) else 0)
     
     if total_base > 0:
-        transport_cost = total_active_area * p['island_transport_per_m2']
-        waste_cost = total_active_area * p['island_waste_per_m2']
-        fixed_exp = p['island_expense_fixed']
+        transport_cost = int(total_active_area * p['island_transport_per_m2'] + 0.5)
+        waste_cost = int(total_active_area * p['island_waste_per_m2'] + 0.5)
+        fixed_exp = int(p['island_expense_fixed'])
         
         common_total = transport_cost + waste_cost + fixed_exp
         total_base += common_total
-        details.append(f"공통내역 소계: {int(common_total):,}원 (소운반 {int(transport_cost):,} + 폐자재 {int(waste_cost):,} + 경비 {fixed_exp:,})")
+        details.append(f"공통내역 소계: {int(common_total):,}원 (소운반 {transport_cost:,} + 폐자재 {waste_cost:,} + 경비 {fixed_exp:,})")
 
     # --- 섬 지역 최종 결과 표시 ---
     st.header("📊 섬지역 견적 결과")
     if total_base == 0:
         st.info("👆 시공할 벽면과 항목을 선택해주세요.")
     else:
-        # 새로운 독립합산 공식 적용: 순수합계 × 40.83% / 순수합계 × 10.879%
-        island_surcharge = int(total_base * p['island_surcharge_rate'])
-        indirect_cost = int(total_base * p['island_indirect_rate'])
-        grand_total = int(total_base) + island_surcharge + indirect_cost
+        # 독립합산 공식 적용 단계
+        total_base_int = int(total_base) # 순수 공사합계
+        total_amount = int(total_base_int * p.get('island_total_amount_rate', 1.1848944)) # 요율반영 총금액
+        island_surcharge = int(total_amount * p.get('island_surcharge_rate', 0.408371)) # 섬할증
+        indirect_cost = int(total_amount * p.get('island_indirect_rate', 0.1087947)) # 간접비
+        grand_total = total_amount + island_surcharge + indirect_cost # 총지원금액
         
         st.markdown(f"<h2 style='text-align:center; color:#e11d48;'>섬지역 총 지원금액: {grand_total:,} 원</h2>", unsafe_allow_html=True)
         
         col1, col2, col3 = st.columns(3)
-        col1.metric("순수 공사합계", f"{int(total_base):,}원")
-        col2.metric(f"도서 할증 ({p['island_surcharge_rate']*100:.2f}%)", f"{island_surcharge:,}원")
-        col3.metric(f"간접비 ({p['island_indirect_rate']*100:.2f}%)", f"{indirect_cost:,}원")
+        col1.metric("총금액 (지원 기준)", f"{total_amount:,}원")
+        col2.metric(f"도서 할증 ({p.get('island_surcharge_rate', 0.408371)*100:.2f}%)", f"{island_surcharge:,}원")
+        col3.metric(f"간접비 ({p.get('island_indirect_rate', 0.1087947)*100:.4f}%)", f"{indirect_cost:,}원")
 
         with st.container(border=True):
-            st.markdown(f"**세부 산출 내역 ({island_wallpaper_mode})**")
+            st.markdown(f"**세부 정산 내역 ({island_wallpaper_mode})**")
+            st.markdown(f"- **순수 공사합계:** {total_base_int:,}원")
+            st.markdown(f"- **총금액 (요율 반영):** {total_amount:,}원")
+            st.markdown(f"- **간접비:** {indirect_cost:,}원")
+            st.markdown(f"- **섬할증:** {island_surcharge:,}원")
+            st.divider()
             for line in details:
                 st.markdown(f"- {line}")
