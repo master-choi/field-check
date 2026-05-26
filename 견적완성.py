@@ -1,12 +1,29 @@
 import streamlit as st
 import json
 
-# ==================== 기본 단가 & 파일 경로 ====================
+# ==================== 관공서 기준 자재비/노무비/간접비 단가 ====================
 DEFAULT_PRICES = {
-    'insulationWall': 42551,
-    'insulationCeiling': 51140,
-    'wallpaper': 12175,
-    'window_per_m2': 531125,
+    # 단열 벽체 (합계: 42,551)
+    'insulationWall_mat': 24351,
+    'insulationWall_lab': 18200,
+    
+    # 단열 천장 (합계: 51,140)
+    'insulationCeiling_mat': 29140,
+    'insulationCeiling_lab': 22000,
+    
+    # 도배 (합계: 12,175)
+    'wallpaper_mat': 5175,
+    'wallpaper_lab': 7000,
+    
+    # 창문 (1m²당 합계: 531,125)
+    'window_mat': 411125,
+    'window_lab': 120000,
+    
+    # 걸레받이 (1m당 합계: 5,000)
+    'skirting_mat': 2000,
+    'skirting_lab': 3000,
+    
+    # 문 및 보일러류 (일체형 관리)
     'homeDoor_110': 300000,
     'homeDoor_120': 350000,
     'homeDoor_130': 400000,
@@ -16,18 +33,19 @@ DEFAULT_PRICES = {
     'entrance_sliding': 800000,
     'boiler': 1100000,
     'oilTank': 200000,
-    'skirting_per_m': 5000,       # 걸레받이 기본 단가 (1m당)
-    'island_surcharge_pct': 40.8  # 섬지역 할증률 기본값 (%)
+    
+    # 할증률 및 간접비 세팅
+    'island_labor_surcharge_pct': 50.0,  # 섬지역 노무비 할증률 (%)
+    'indirect_cost_pct': 10.8            # 일반관리비/이윤 등 간접비 요율 (%)
 }
-ADMIN_PASSWORD = '0131'
-PRICE_FILE = "prices.json"
 
-# ==================== 단가 불러오기/저장 함수 ====================
+ADMIN_PASSWORD = '0131'
+PRICE_FILE = "prices_pro.json"
+
 def load_prices():
     try:
         with open(PRICE_FILE, 'r') as f:
             loaded = json.load(f)
-            # 새로운 단가 항목이 기존 파일에 없을 경우를 대비해 병합
             for k, v in DEFAULT_PRICES.items():
                 if k not in loaded:
                     loaded[k] = v
@@ -39,70 +57,80 @@ def save_prices(prices):
     with open(PRICE_FILE, 'w') as f:
         json.dump(prices, f, indent=2)
 
-# 세션 상태 초기화
 if 'prices' not in st.session_state:
     st.session_state.prices = load_prices()
 
-st.set_page_config(page_title="온성 견적 마스터", page_icon="🏗️", layout="centered")
-
-st.markdown("<h1 style='text-align: center;'>🏗️ 온성 견적 산출기</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: gray;'>치수를 입력하면 자동으로 총액이 계산됩니다</p>", unsafe_allow_html=True)
+st.set_page_config(page_title="온성 견적 마스터 PRO", page_icon="🏗️", layout="centered")
+st.markdown("<h1 style='text-align: center;'>🏗️ 온성 견적 산출기 (정밀 정산형)</h1>", unsafe_allow_html=True)
 
 # ==================== 관리자 패널 ====================
-with st.expander("🔒 단가 및 할증 설정 (관리자)"):
+with st.expander("🔒 단가 / 할증 / 간접비 설정 (관리자)"):
     pw = st.text_input("관리자 비밀번호", type="password")
     if pw == ADMIN_PASSWORD:
-        st.success("관리자 모드 활성화")
-        st.caption("※ 수정 후 반드시 [설정 저장]을 눌러주세요.")
-
+        st.success("관리자 정밀 모드 활성화")
+        
+        st.markdown("### 🔹 공종별 자재비 / 노무비 분리 입력")
         col1, col2 = st.columns(2)
         with col1:
-            st.session_state.prices['insulationWall'] = st.number_input("단열 벽 (1m²당)", value=st.session_state.prices['insulationWall'], step=1000)
-            st.session_state.prices['insulationCeiling'] = st.number_input("단열 천장 (1m²당)", value=st.session_state.prices['insulationCeiling'], step=1000)
-            st.session_state.prices['wallpaper'] = st.number_input("도배 (1m²당)", value=st.session_state.prices['wallpaper'], step=1000)
-            st.session_state.prices['window_per_m2'] = st.number_input("창문 (1m²당)", value=st.session_state.prices['window_per_m2'], step=1000)
-            st.session_state.prices['boiler'] = st.number_input("보일러 설치", value=st.session_state.prices['boiler'], step=1000)
-            st.session_state.prices['oilTank'] = st.number_input("기름통 추가", value=st.session_state.prices['oilTank'], step=1000)
+            st.markdown("**[자재비 단가]**")
+            st.session_state.prices['insulationWall_mat'] = st.number_input("단열 벽 자재비", value=st.session_state.prices['insulationWall_mat'], step=500)
+            st.session_state.prices['insulationCeiling_mat'] = st.number_input("단열 천장 자재비", value=st.session_state.prices['insulationCeiling_mat'], step=500)
+            st.session_state.prices['wallpaper_mat'] = st.number_input("도배 자재비", value=st.session_state.prices['wallpaper_mat'], step=500)
+            st.session_state.prices['window_mat'] = st.number_input("창문 자재비 (1m²당)", value=st.session_state.prices['window_mat'], step=1000)
+            st.session_state.prices['skirting_mat'] = st.number_input("걸레받이 자재비 (1m당)", value=st.session_state.prices['skirting_mat'], step=100)
         with col2:
+            st.markdown("**[노무비 인건비 단가]**")
+            st.session_state.prices['insulationWall_lab'] = st.number_input("단열 벽 노무비", value=st.session_state.prices['insulationWall_lab'], step=500)
+            st.session_state.prices['insulationCeiling_lab'] = st.number_input("단열 천장 노무비", value=st.session_state.prices['insulationCeiling_lab'], step=500)
+            st.session_state.prices['wallpaper_lab'] = st.number_input("도배 노무비", value=st.session_state.prices['wallpaper_lab'], step=500)
+            st.session_state.prices['window_lab'] = st.number_input("창문 노무비 (1m²당)", value=st.session_state.prices['window_lab'], step=1000)
+            st.session_state.prices['skirting_lab'] = st.number_input("걸레받이 노무비 (1m당)", value=st.session_state.prices['skirting_lab'], step=100)
+            
+        st.divider()
+        st.markdown("### 🔹 문 및 장비 단가")
+        col3, col4 = st.columns(2)
+        with col3:
             st.session_state.prices['homeDoor_110'] = st.number_input("홈도어 110mm", value=st.session_state.prices['homeDoor_110'], step=1000)
             st.session_state.prices['homeDoor_120'] = st.number_input("홈도어 120mm", value=st.session_state.prices['homeDoor_120'], step=1000)
             st.session_state.prices['homeDoor_130'] = st.number_input("홈도어 130mm", value=st.session_state.prices['homeDoor_130'], step=1000)
             st.session_state.prices['homeDoor_150'] = st.number_input("홈도어 150mm", value=st.session_state.prices['homeDoor_150'], step=1000)
+        with col4:
             st.session_state.prices['entrance_hinge'] = st.number_input("출입문 여닫이", value=st.session_state.prices['entrance_hinge'], step=1000)
             st.session_state.prices['entrance_hinge_fix'] = st.number_input("출입문 여닫이+픽스창", value=st.session_state.prices['entrance_hinge_fix'], step=1000)
             st.session_state.prices['entrance_sliding'] = st.number_input("출입문 미닫이", value=st.session_state.prices['entrance_sliding'], step=1000)
-        
+            st.session_state.prices['boiler'] = st.number_input("보일러 설치", value=st.session_state.prices['boiler'], step=1000)
+            st.session_state.prices['oilTank'] = st.number_input("기름통 추가", value=st.session_state.prices['oilTank'], step=1000)
+
         st.divider()
-        st.markdown("**🔧 추가 항목 및 할증률 설정**")
-        col3, col4 = st.columns(2)
-        with col3:
-            st.session_state.prices['skirting_per_m'] = st.number_input("걸레받이 단가 (1m당)", value=st.session_state.prices.get('skirting_per_m', 5000), step=500)
-        with col4:
-            st.session_state.prices['island_surcharge_pct'] = st.number_input("섬지역 할증률 (%)", value=float(st.session_state.prices.get('island_surcharge_pct', 40.8)), step=0.1, format="%.1f", help="40.8% 또는 50% 등으로 자유롭게 변경 가능합니다.")
+        st.markdown("### 🔹 요율 설정 (할증 및 간접비)")
+        col_rate1, col_rate2 = st.columns(2)
+        with col_rate1:
+            st.session_state.prices['island_labor_surcharge_pct'] = st.number_input("🏝️ 섬지역 노무비 할증률 (%)", value=float(st.session_state.prices.get('island_labor_surcharge_pct', 50.0)), step=0.1, format="%.1f")
+        with col_rate2:
+            st.session_state.prices['indirect_cost_pct'] = st.number_input("📊 일반관리비 등 간접비율 (%)", value=float(st.session_state.prices.get('indirect_cost_pct', 10.8)), step=0.1, format="%.1f", help="재단 서류상의 기타 대행비, 간접비 총비율입니다.")
 
         col_btn1, col_btn2 = st.columns(2)
         with col_btn1:
-            if st.button("💾 설정 저장", use_container_width=True):
+            if st.button("💾 정밀 설정 저장", use_container_width=True):
                 save_prices(st.session_state.prices)
-                st.success("설정이 저장되었습니다. (앱을 다시 실행해도 유지됩니다)")
+                st.success("설정 데이터가 안전하게 저장되었습니다.")
         with col_btn2:
-            if st.button("🔄 기본 단가로 초기화", use_container_width=True):
+            if st.button("🔄 초기화", use_container_width=True):
                 st.session_state.prices = DEFAULT_PRICES.copy()
-                st.success("기본 단가로 초기화되었습니다. 저장하려면 [설정 저장]을 눌러주세요.")
                 st.rerun()
     elif pw:
-        st.error("비밀번호가 틀렸습니다.")
+        st.error("비밀번호가 일치하지 않습니다.")
 
 st.divider()
 
-# ==================== 입력 섹션 ====================
+# ==================== 메인 입력 섹션 ====================
 col_limit, col_island = st.columns([2, 1])
 with col_limit:
     limit = st.number_input("💰 공사 한도 금액 (원)", value=3000000, step=100000)
 with col_island:
-    st.write("") # 간격 맞추기용
-    st.write("") 
-    is_island = st.checkbox("🏝️ 섬 지역 현장", help="체크 시 설정된 비율만큼 도서 할증이 자동 계산됩니다.")
+    st.write("")
+    st.write("")
+    is_island = st.checkbox("🏝️ 섬 지역 현장 (도서할증)", help="체크 시 순수 노무비 항목에 50% 할증이 적용됩니다.")
 
 st.subheader("📏 방 치수 (mm)")
 col_h, col_w, col_l = st.columns(3)
@@ -125,7 +153,7 @@ eastArea = l_m * h_m
 westArea = l_m * h_m
 ceilingArea = w_m * l_m
 
-st.subheader("🪟 창문")
+st.subheader("🪟 창문 치수")
 winCount = st.selectbox("창문 개수", [0, 1, 2, 3])
 windows = []
 for i in range(winCount):
@@ -135,35 +163,34 @@ for i in range(winCount):
     with wc2: winH = st.number_input(f"세로 (mm)", value=1400, step=100, key=f"winH_{i}")
     windows.append((winW, winH))
 
-st.subheader("🚪 홈도어 (방문)")
-homeDoorCount = st.selectbox("홈도어 개수", [0, 1, 2])
-homeDoors = []
-for i in range(homeDoorCount):
-    thick = st.selectbox(f"홈도어 {i+1} 바 두께", ["110", "120", "130", "150"], index=1, key=f"hd_{i}")
-    homeDoors.append(thick)
+st.subheader("🚪 홈도어 / 출입문")
+hdc, edc = st.columns(2)
+with hdc:
+    homeDoorCount = st.selectbox("방문(홈도어) 개수", [0, 1, 2])
+    homeDoors = []
+    for i in range(homeDoorCount):
+        thick = st.selectbox(f"방문 {i+1} 바 두께", ["110", "120", "130", "150"], index=1, key=f"hd_{i}")
+        homeDoors.append(thick)
+with edc:
+    entranceDoorCount = st.selectbox("현관문(출입문) 개수", [0, 1, 2])
+    entranceDoors = []
+    entrance_options = {"여닫이 (기본)": "hinge", "여닫이 + 픽스창": "hinge_fix", "미닫이": "sliding"}
+    for i in range(entranceDoorCount):
+        etype = st.selectbox(f"현관문 {i+1} 종류", list(entrance_options.keys()), key=f"ed_{i}")
+        entranceDoors.append(entrance_options[etype])
 
-st.subheader("🚪 출입문 (현관문)")
-entranceDoorCount = st.selectbox("출입문 개수", [0, 1, 2])
-entranceDoors = []
-entrance_options = {"여닫이 (기본)": "hinge", "여닫이 + 픽스창": "hinge_fix", "미닫이": "sliding"}
-for i in range(entranceDoorCount):
-    etype = st.selectbox(f"출입문 {i+1} 종류", list(entrance_options.keys()), key=f"ed_{i}")
-    entranceDoors.append(entrance_options[etype])
-
-st.subheader("🔥 보일러 / 기름통")
+st.subheader("🔥 보일러")
 bc1, bc2 = st.columns(2)
 with bc1: boiler = st.checkbox("보일러 설치")
 with bc2: oilTank = st.checkbox("기름통 추가", disabled=not boiler)
 
 st.divider()
 
-# ==================== 자동 개구부 면적 계산 ====================
+# ==================== 면적 및 개구부 공제 연산 ====================
 total_window_area = sum([(w * h) / 1000000 for w, h in windows])
-# 일반적인 방문 규격(0.9m x 2.1m ≒ 1.89m²), 현관문 규격(1.0m x 2.1m ≒ 2.1m²) 적용
 total_door_area = (homeDoorCount * 1.89) + (entranceDoorCount * 2.1)
 total_opening_area = total_window_area + total_door_area
 
-# ==================== 면적 및 걸레받이 계산 로직 ====================
 insWallArea = 0
 insCeilingArea = 0
 if wallSouth: insWallArea += southArea
@@ -172,146 +199,139 @@ if wallEast: insWallArea += eastArea
 if wallWest: insWallArea += westArea
 if ceiling: insCeilingArea += ceilingArea
 
-# 벽체 단열 면적에서 개구부 차감 (음수 방지)
 if insWallArea > 0:
     insWallArea = max(0.0, insWallArea - total_opening_area)
 
-# --- 자동 도배 범위 및 걸레받이 길이(m) 계산 ---
+# 도배 및 걸레받이 자동 계산 규칙
 insulated_surfaces = [wallSouth, wallNorth, wallEast, wallWest, ceiling]
 ins_count = sum(insulated_surfaces)
-
-skirtingLength = 0  # 걸레받이 길이 (미터)
+skirtingLength = 0
 
 if ins_count >= 2:
-    # 전체 도배 (벽 전체 면적에서 개구부를 빼고 천장을 더함)
     total_wall_area = southArea + northArea + eastArea + westArea
-    deducted_wall_area = max(0.0, total_wall_area - total_opening_area)
-    wallpaperArea = deducted_wall_area + ceilingArea
-    wallpaper_msg = "🎨 전체 도배 (벽+천장) [개구부 자동 차감 반영]"
-    # 벽 도배가 들어가므로 방 전체 둘레 걸레받이 추가
+    wallpaperArea = max(0.0, total_wall_area - total_opening_area) + ceilingArea
     skirtingLength = (w_m + l_m) * 2
 elif ins_count == 1:
-    if wallSouth:
-        wallpaperArea = max(0.0, southArea - total_opening_area)
-        msg = "남벽"
-        skirtingLength = w_m
-    elif wallNorth:
-        wallpaperArea = max(0.0, northArea - total_opening_area)
-        msg = "북벽"
-        skirtingLength = w_m
-    elif wallEast:
-        wallpaperArea = max(0.0, eastArea - total_opening_area)
-        msg = "동벽"
-        skirtingLength = l_m
-    elif wallWest:
-        wallpaperArea = max(0.0, westArea - total_opening_area)
-        msg = "서벽"
-        skirtingLength = l_m
-    else:  # ceiling (천장만 도배)
-        wallpaperArea = ceilingArea
-        msg = "천장"
-        skirtingLength = 0  # 천장 도배만 진행 시 걸레받이 제외
-    
-    if skirtingLength > 0:
-        wallpaper_msg = f"🎨 부분 도배 ({msg}만) [개구부 자동 차감 반영]"
-    else:
-        wallpaper_msg = f"🎨 부분 도배 ({msg}만)"
+    if wallSouth: wallpaperArea = max(0.0, southArea - total_opening_area); skirtingLength = w_m
+    elif wallNorth: wallpaperArea = max(0.0, northArea - total_opening_area); skirtingLength = w_m
+    elif wallEast: wallpaperArea = max(0.0, eastArea - total_opening_area); skirtingLength = l_m
+    elif wallWest: wallpaperArea = max(0.0, westArea - total_opening_area); skirtingLength = l_m
+    else: wallpaperArea = ceilingArea; skirtingLength = 0
 else:
     wallpaperArea = 0
-    wallpaper_msg = "🎨 도배 안함"
-    skirtingLength = 0
 
-st.info(wallpaper_msg)
-
-# ==================== 금액 집계 및 상세 내역 작성 ====================
-base_total = 0
+# ==================== 자재비 / 노무비 분리 계산 ====================
+total_mat = 0
+total_lab = 0
 details = []
 p = st.session_state.prices
 
-# 단열
+# 1. 단열 벽체
 if insWallArea > 0:
-    cost = insWallArea * p['insulationWall']
-    base_total += cost
-    details.append(f"단열(벽체): {insWallArea:.2f}m² × {p['insulationWall']:,}원 = {int(cost):,}원 (개구부 차감 완료)")
+    m_cost = insWallArea * p['insulationWall_mat']
+    l_cost = insWallArea * p['insulationWall_lab']
+    total_mat += m_cost
+    total_lab += l_cost
+    details.append(f"단열(벽체) {insWallArea:.2f}m²: 자재 {int(m_cost):,}원 / 노무 {int(l_cost):,}원")
 
+# 2. 단열 천장
 if insCeilingArea > 0:
-    cost = insCeilingArea * p['insulationCeiling']
-    base_total += cost
-    details.append(f"단열(천장): {insCeilingArea:.2f}m² × {p['insulationCeiling']:,}원 = {int(cost):,}원")
+    m_cost = insCeilingArea * p['insulationCeiling_mat']
+    l_cost = insCeilingArea * p['insulationCeiling_lab']
+    total_mat += m_cost
+    total_lab += l_cost
+    details.append(f"단열(천장) {insCeilingArea:.2f}m²: 자재 {int(m_cost):,}원 / 노무 {int(l_cost):,}원")
 
-# 도배
+# 3. 도배
 if wallpaperArea > 0:
-    cost = wallpaperArea * p['wallpaper']
-    base_total += cost
-    modeText = "전체" if ins_count >= 2 else "부분"
-    details.append(f"도배 ({modeText}): {wallpaperArea:.2f}m² × {p['wallpaper']:,}원 = {int(cost):,}원")
+    m_cost = wallpaperArea * p['wallpaper_mat']
+    l_cost = wallpaperArea * p['wallpaper_lab']
+    total_mat += m_cost
+    total_lab += l_cost
+    details.append(f"도배 공정 {wallpaperArea:.2f}m²: 자재 {int(m_cost):,}원 / 노무 {int(l_cost):,}원")
 
-# 걸레받이 (벽체 도배 시 무조건 자동 추가)
+# 4. 걸레받이
 if skirtingLength > 0:
-    skirting_cost = skirtingLength * p.get('skirting_per_m', 5000)
-    base_total += skirting_cost
-    details.append(f"걸레받이: {skirtingLength:.2f}m × {p.get('skirting_per_m', 5000):,}원 = {int(skirting_cost):,}원")
+    m_cost = skirtingLength * p['skirting_mat']
+    l_cost = skirtingLength * p['skirting_lab']
+    total_mat += m_cost
+    total_lab += l_cost
+    details.append(f"걸레받이 {skirtingLength:.2f}m: 자재 {int(m_cost):,}원 / 노무 {int(l_cost):,}원")
 
-# 창문
+# 5. 창문
 for i, (w, h) in enumerate(windows):
     area = (w * h) / 1000000
-    cost = area * p['window_per_m2']
-    base_total += cost
-    details.append(f"창문 {i+1}: {w}×{h}mm ({area:.2f}m²) = {int(cost):,}원")
+    m_cost = area * p['window_mat']
+    l_cost = area * p['window_lab']
+    total_mat += m_cost
+    total_lab += l_cost
+    details.append(f"창문 {i+1} ({area:.2f}m²): 자재 {int(m_cost):,}원 / 노무 {int(l_cost):,}원")
 
-# 홈도어
+# 6. 문, 보일러류 (자재비 70% / 노무비 30% 기본 분할 적용)
 for i, thick in enumerate(homeDoors):
     price = p.get(f'homeDoor_{thick}', 350000)
-    base_total += price
-    details.append(f"홈도어 {i+1} ({thick}mm): {price:,}원")
+    total_mat += price * 0.7
+    total_lab += price * 0.3
+    details.append(f"방문 {i+1} ({thick}mm): {price:,}원")
 
-# 출입문
 for i, etype in enumerate(entranceDoors):
     price = p.get(f'entrance_{etype}', 700000)
-    label = [k for k, v in entrance_options.items() if v == etype][0]
-    base_total += price
-    details.append(f"출입문 {i+1} ({label}): {price:,}원")
+    total_mat += price * 0.7
+    total_lab += price * 0.3
+    details.append(f"현관문 {i+1}: {price:,}원")
 
-# 보일러/기름통
 if boiler:
-    base_total += p['boiler']
+    total_mat += p['boiler'] * 0.7
+    total_lab += p['boiler'] * 0.3
     details.append(f"보일러 설치: {p['boiler']:,}원")
 if oilTank:
-    base_total += p['oilTank']
+    total_mat += p['oilTank'] * 0.8
+    total_lab += p['oilTank'] * 0.2
     details.append(f"기름통 추가: {p['oilTank']:,}원")
 
-# --- 섬지역 할증 연산 ---
-final_total = base_total
-surcharge_cost = 0
-if is_island and base_total > 0:
-    surcharge_pct = p.get('island_surcharge_pct', 40.8)
-    surcharge_cost = base_total * (surcharge_pct / 100)
-    final_total = base_total + surcharge_cost
+# ==================== 관공서식 연산 (할증 및 간접비) ====================
+labor_surcharge = 0
+if is_island:
+    surcharge_pct = p.get('island_labor_surcharge_pct', 50.0)
+    # 1. 순수 노무비에 대해서만 50% 도서 할증 계산
+    labor_surcharge = total_lab * (surcharge_pct / 100)
 
-# ==================== 결과 표시 ====================
-st.header("📊 견적 결과")
+# 2. 직접공사비 합계 = 순수 자재비 + 순수 노무비 + 도서할증료
+direct_construction_cost = total_mat + total_lab + labor_surcharge
+
+# 3. 간접비 계산 = 직접공사비 × 간접비 요율
+indirect_cost_rate = p.get('indirect_cost_pct', 10.8) / 100
+indirect_cost = direct_construction_cost * indirect_cost_rate
+
+# 4. 최종 견적 총액 = 직접공사비 + 간접비
+final_total = direct_construction_cost + indirect_cost
+
+# ==================== 화면 결과 표출 ====================
+st.header("📊 관공서 기준 견적 결과")
 
 if final_total == 0:
-    st.info("👆 위 항목들을 입력해주세요")
+    st.info("👆 계산할 면적이나 공종 항목을 선택해 주세요.")
 else:
     remainder = limit - final_total
-
     if remainder < 0:
-        st.error(f"⚠️ 예산 초과! (초과 금액: {abs(int(remainder)):,}원)")
+        st.error(f"⚠️ 예산 초과 상태 (초과액: {abs(int(remainder)):,}원)")
     else:
-        st.success(f"✅ 예산 내 적정 (남은 잔액: {int(remainder):,}원)")
+        st.success(f"✅ 예산 범위 내 적정 (잔여 금액: {int(remainder):,}원)")
 
-    st.markdown(f"<h2 style='text-align:center; color:#2563eb;'>총 견적: {int(final_total):,} 원</h2>", unsafe_allow_html=True)
+    st.markdown(f"<h2 style='text-align:center; color:#1e40af;'>최종 지원 금액 총액: {int(final_total):,} 원</h2>", unsafe_allow_html=True)
 
     with st.container(border=True):
-        st.markdown("**세부 산출 내역**")
-        if total_opening_area > 0:
-            st.caption(f"💡 시스템 안내: 창문/문 포함 총 {total_opening_area:.2f}m²의 개구부 면적이 벽체 면적에서 자동 차감되었습니다.")
+        st.markdown("**📋 관공서 제출용 정산 내역**")
+        st.write(f"- 기본 순수 자재비 합계: {int(total_mat):,} 원")
+        st.write(f"- 기본 순수 노무비 합계: {int(total_lab):,} 원")
         
-        # 기본 공사 항목 출력
-        for line in details:
-            st.markdown(f"- {line}")
-            
-        # 섬지역일 경우 할증 항목 하단에 추가 표시
         if is_island:
-            st.markdown(f"<span style='color:#ea580c;'>- **섬지역 도서 할증 ({p.get('island_surcharge_pct', 40.8):.1f}%)**: {int(surcharge_cost):,}원</span>", unsafe_allow_html=True)
+            st.markdown(f"- <span style='color:#c2410c;'>🏝️ 도서지역 노무비 할증 ({p.get('island_labor_surcharge_pct', 50.0):.1f}%): {int(labor_surcharge):,} 원</span>", unsafe_allow_html=True)
+        
+        st.write(f"- **직접 공사비 소계**: {int(direct_construction_cost):,} 원")
+        st.markdown(f"- **제간접비 및 대행비 ({p.get('indirect_cost_pct', 10.8):.1f}%)**: {int(indirect_cost):,} 원")
+        
+        st.divider()
+        st.caption("🔍 공종별 상세 산출 근거 (참고용)")
+        for line in details:
+            st.caption(line)
